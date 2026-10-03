@@ -72,7 +72,7 @@ const BOOKS = [
     author: "अनजान मुसाफ़िर",
     pages: 119, language: "हिंदी", price: 49, mrp: 499,
     cover: "vicharon-ki-kaid.jpg",
-    checkout: "https://payhip.com/buy?link=9ONVy",
+    checkout: "https://payhip.com/b/9ONVy",
     featured: false, popular: false,
     desc: "यह किताब आपके विचारों को चुप कराने का वादा नहीं करती। यह उन्हें थोड़ा बेहतर समझने की एक यात्रा है: Overthinking, डर, बीती बातें और आने वाले कल की चिंता के बीच से।",
     inside: ["Overthinking और मन के दोहराव वाले पैटर्न", "डर, अतीत और भविष्य की चिंता", "Perfectionism, तुलना और control को समझना", "20 अध्याय, 21-Day Mind Practice और एक Mind System"],
