@@ -68,3 +68,25 @@ details{border-bottom:1px solid var(--line);padding:.7rem 0}summary{cursor:point
 .fan img:nth-child(1){--r:-6deg;margin-left:0}.fan img:nth-child(2){--r:-2deg}.fan img:nth-child(3){--r:2deg}.fan img:nth-child(4){--r:6deg}
 @media(min-width:760px){.hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;column-gap:3rem;align-items:center}.hero .wrap>*{grid-column:1}.hero .fan{grid-column:2;grid-row:1/5;margin:0}.fan img{width:130px;margin-left:-28px}.route{display:none}}
 .chaps{columns:1;padding-left:1.4rem}.chaps li{break-inside:avoid}@media(min-width:760px){.chaps{columns:2;column-gap:2.4rem;max-width:none}}
+
+/* ===== policy / info pages ===== */
+.phead{background:var(--ink);color:var(--paper);padding:clamp(2.2rem,7vw,3.8rem) 0 clamp(1.8rem,5vw,2.6rem)}
+.phead h1{font-size:clamp(1.9rem,6vw,3rem);margin-bottom:.5rem}
+.phead.c{text-align:center}.phead.c .narrow{margin-inline:auto}
+.crumb{font-size:.9rem;color:#aab2ac;margin:0 0 .9rem}.crumb a{text-decoration:none}.crumb a:hover{color:var(--gold)}
+.upd{color:#c3c9c2;font-size:.95rem;margin:0}
+.trail{height:0;border-top:2px dashed #ffffff40;margin-top:1.6rem;position:relative}
+.trail:after{content:"";position:absolute;right:12%;top:-7px;width:12px;height:12px;border-radius:50%;background:var(--gold)}
+.tick{width:64px;height:64px;border-radius:50%;background:var(--gold);color:#16120a;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem}
+.tick svg{width:30px;height:30px}
+.doc{padding:clamp(1.8rem,5vw,3rem) 0 clamp(2.4rem,6vw,4rem);counter-reset:s}
+.doc a{color:var(--teal);font-weight:600}.doc .btn{text-decoration:none}.doc .btn.primary{color:#16120a}
+.sum{background:#e7e9e2;border-left:4px solid var(--teal);border-radius:0 6px 6px 0;padding:1rem 1.2rem;margin:0 0 1.6rem}
+.sum p{margin:0}
+.doc h2{font-size:clamp(1.2rem,3.8vw,1.45rem);margin:2rem 0 .5rem;padding-top:1.1rem;border-top:1px solid var(--line)}
+.doc.num h2:before{counter-increment:s;content:counter(s) ".";color:var(--gold);font-family:var(--sans);font-weight:600;margin-right:.55rem}
+.doc ul,.doc ol{margin:0 0 1rem}
+.cgrid{display:grid;gap:1rem;margin:0 0 1rem}@media(min-width:760px){.cgrid{grid-template-columns:1fr 1fr}}
+.ccard{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1.3rem}
+.ccard h3{margin-bottom:.3rem}.ccard p{color:var(--mute);font-size:.95rem}.ccard .btn{display:block}
+.steps{padding-left:1.3rem}.steps li{margin-bottom:.7rem}

@@ -82,8 +82,8 @@
   function chrome() {
     var l = SITE.legal;
     $("#foot").innerHTML = '<div class="wrap fgrid"><div><p class="brand">ANJAAN MUSAFIR BOOKS</p><p>हर सफ़र बाहर जाने का नहीं होता।</p></div>' +
-      '<nav aria-label="Footer"><a href="index.html#books">Books</a><a href="index.html#about">About</a><a href="index.html#contact">Contact</a>' +
-      '<a href="' + l.privacy + '">Privacy Policy</a><a href="' + l.terms + '">Terms &amp; Conditions</a><a href="' + l.refund + '">Refund Policy</a></nav>' +
+      '<nav aria-label="Footer"><a href="index.html#books">Books</a><a href="index.html#about">About</a><a href="contact.html">Contact</a>' +
+      '<a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms &amp; Conditions</a><a href="refund.html">Refund Policy</a></nav>' +
       '<div><a href="mailto:' + SITE.email + '">' + SITE.email + '</a><a href="' + SITE.instagram + '" target="_blank" rel="noopener">Instagram ' + SITE.instagramName + "</a></div></div>" +
       '<p class="wrap copy">© 2026 Anjaan Musafir Books · Owned &amp; Operated by Nitendra Sahu · All Rights Reserved.</p>';
     var m = $("#menu"), n = $("#nav");
@@ -94,5 +94,6 @@
   }
 
   chrome();
-  if (document.body.dataset.page === "home") home(); else book();
+  var pg = document.body.dataset.page;
+  if (pg === "home") home(); else if (pg === "book") book();
 })();
