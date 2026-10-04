@@ -12,14 +12,16 @@
   }
 
   function buy(b, cls) {
-    cls = cls || "btn";
-    if (b.checkout) return '<a class="' + cls + ' primary" href="' + esc(b.checkout) + '" target="_blank" rel="noopener">Buy Now</a>';
+    function buy(b, cls) {
+  cls = cls || "btn";
+
+  if (!b.checkout) {
     return '<span class="' + cls + ' off-btn" aria-disabled="true">जल्द उपलब्ध</span>';
   }
 
-  function badge(b) { return b.popular ? '<span class="badge">Popular</span>' : ""; }
-  function link(b) { return "book.html?book=" + encodeURIComponent(b.id); }
-
+  return '<button type="button" class="' + cls + ' primary buy-btn" data-product-id="' +
+    esc(b.id) + '">Buy Now</button>';
+    }
   function card(b) {
     return '<article class="card">' + badge(b) +
       '<a href="' + link(b) + '"><img src="' + esc(b.cover) + '" alt="' + esc(b.title) + ' — eBook cover" loading="lazy"></a>' +
@@ -92,7 +94,153 @@
     var c = $("#contactlinks");
     if (c) c.innerHTML = '<a href="mailto:' + SITE.email + '">' + SITE.email + '</a><a href="' + SITE.instagram + '" target="_blank" rel="noopener">Instagram ' + SITE.instagramName + "</a>";
   }
+  var WORKER_URL = "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev";
 
+  var PRODUCT_IDS = {
+    "dimag-ka-shor": "DIMAG_KA_SHOR",
+    "ai-career": "AI_PLUS_CAREER",
+    "aadaton-ke-paar": "AADATON_KE_PAAR",
+    "vicharon-ki-kaid": "VICHARON_KI_KAID",
+    "reality-of-manifestation": "REALITY_OF_MANIFESTATION"
+  };
+
+  document.addEventListener("click", async function (e) {
+    var btn = e.target.closest(".buy-btn");
+    if (!btn) return;
+
+    var productId = btn.getAttribute("data-product-id");
+    var backendProductId = PRODUCT_IDS[productId];
+
+    if (!backendProductId) {
+      alert("Book not found.");
+      return;
+    }
+
+    var name = prompt("अपना नाम लिखें:");
+    if (name === null) return;
+
+    var email = prompt("अपना Email लिखें:");
+    if (email === null) return;
+
+    var phone = prompt("अपना 10-digit Mobile Number लिखें:");
+    if (phone === null) return;
+
+    name = name.trim();
+    email = email.trim();
+    phone = phone.replace(/\D/g, "");
+
+    if (!email || !email.includes("@")) {
+      alert("कृपया सही Email डालें।");
+      return;
+    }
+
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      alert("कृपया सही 10-digit Indian Mobile Number डालें।");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Opening Payment...";
+
+    try {
+      var response = await fetch(WORKER_URL + "/api/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          product_id: backendProductId,
+          name: name,
+          email: email,
+          phone: phone
+        })
+      });
+
+      var data = await response.json();
+
+      if (!response.ok || !data.payment_session_id) {
+        console.error(data);
+        alert("Payment शुरू नहीं हो सका। कृपया फिर कोशिश करें।");
+        btn.disabled = false;
+        btn.textContent = "Buy Now";
+        return;
+      }
+
+      var cashfree = Cashfree({
+        mode: "sandbox"
+      });
+
+      await cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_self"
+      });
+
+    } catch (err) {
+      console.error(err);
+      alert("Payment system से connection नहीं हो पाया।");
+      btn.disabled = false;
+      btn.textContent = "Buy Now";
+    }
+  });
+
+  async function checkPaymentReturn() {
+    var params = new URLSearchParams(location.search);
+    var orderId = params.get("order_id");
+    var paymentReturn = params.get("payment");
+
+    if (paymentReturn !== "return" || !orderId) return;
+
+    var box = document.createElement("div");
+    box.style.cssText =
+      "position:fixed;inset:0;background:#101a26;color:white;" +
+      "display:flex;align-items:center;justify-content:center;" +
+      "z-index:99999;padding:24px;text-align:center;font-family:Arial,sans-serif;";
+
+    box.innerHTML =
+      "<div><h2>Payment verify हो रहा है...</h2>" +
+      "<p>कृपया कुछ सेकंड इंतज़ार करें।</p></div>";
+
+    document.body.appendChild(box);
+
+    try {
+      var response = await fetch(
+        WORKER_URL + "/api/payment-status?order_id=" +
+        encodeURIComponent(orderId)
+      );
+
+      var data = await response.json();
+
+      if (data.status === "PAID" && data.download_url) {
+        box.innerHTML =
+          "<div>" +
+          "<h2>Payment Successful ✅</h2>" +
+          "<p>आपकी eBook तैयार है।</p>" +
+          '<a href="' + data.download_url +
+          '" style="display:inline-block;padding:14px 22px;background:#b8892e;color:white;text-decoration:none;border-radius:8px;margin-top:15px;">Download eBook</a>' +
+          "</div>";
+      } else if (data.status === "PENDING") {
+        box.innerHTML =
+          "<div><h2>Payment अभी verify हो रहा है</h2>" +
+          "<p>कुछ सेकंड बाद फिर कोशिश करें।</p></div>";
+      } else {
+        box.innerHTML =
+          "<div><h2>Payment verify नहीं हुआ</h2>" +
+          "<p>अगर payment से पैसे कटे हैं तो दोबारा payment न करें।</p></div>";
+      }
+
+    } catch (err) {
+      console.error(err);
+      box.innerHTML =
+        "<div><h2>Verification में समस्या हुई</h2>" +
+        "<p>कृपया कुछ देर बाद फिर कोशिश करें।</p></div>";
+    }
+  }
+
+  checkPaymentReturn();
+
+  chrome();
+  var pg = document.body.dataset.page;
+  if (pg === "home") home(); else if (pg === "book") book();
   chrome();
   var pg = document.body.dataset.page;
   if (pg === "home") home(); else if (pg === "book") book();
