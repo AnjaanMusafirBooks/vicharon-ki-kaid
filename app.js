@@ -1,5 +1,7 @@
 (function () {
-  var $ = function (s) { return document.querySelector(s); };
+  var $ = function (s) {
+    return document.querySelector(s);
+  };
 
   var esc = function (t) {
     return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) {
@@ -17,51 +19,182 @@
     return "₹" + n;
   };
 
-  function price(b, big) {
-    var off = b.mrp && b.mrp > b.price
-      ? Math.round((1 - b.price / b.mrp) * 100)
-      : 0;
+  /* =========================
+     CLOUDFLARE WORKER
+  ========================= */
 
-    return '<div class="price' + (big ? " big" : "") + '">' +
-      (big ? '<p class="plabel">' + esc(SITE.priceLabel) + "</p>" : "") +
-      '<span class="now">' + rs(b.price) + "</span>" +
-      (off
-        ? '<s>' + rs(b.mrp) + '</s><span class="off">' + off + "% OFF</span>"
-        : "") +
-      "</div>";
+  var WORKER_URL =
+    "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev";
+
+  var PRODUCT_IDS = {
+    "dimag-ka-shor": "DIMAG_KA_SHOR",
+    "ai-career": "AI_PLUS_CAREER",
+    "aadaton-ke-paar": "AADATON_KE_PAAR",
+    "vicharon-ki-kaid": "VICHARON_KI_KAID",
+    "reality-of-manifestation": "REALITY_OF_MANIFESTATION"
+  };
+
+  /* =========================
+     D1 PRICE CACHE
+  ========================= */
+
+  var D1_PRODUCTS = {};
+
+  async function loadD1Products() {
+    if (typeof BOOKS === "undefined") return;
+
+    await Promise.all(
+      BOOKS.map(async function (b) {
+        var backendId = PRODUCT_IDS[b.id];
+
+        if (!backendId) return;
+
+        try {
+          var response = await fetch(
+            WORKER_URL +
+              "/api/product?product_id=" +
+              encodeURIComponent(backendId),
+            {
+              method: "GET",
+              cache: "no-store"
+            }
+          );
+
+          if (!response.ok) return;
+
+          var data = await response.json();
+
+          if (data && data.price != null) {
+            D1_PRODUCTS[b.id] = data;
+          }
+        } catch (err) {
+          console.warn(
+            "D1 product load failed for:",
+            b.id,
+            err
+          );
+        }
+      })
+    );
   }
+
+  function currentPrice(b) {
+    if (
+      D1_PRODUCTS[b.id] &&
+      D1_PRODUCTS[b.id].price != null
+    ) {
+      return Number(D1_PRODUCTS[b.id].price);
+    }
+
+    return Number(b.price);
+  }
+
+  function currentMrp(b) {
+    return Number(b.mrp || 0);
+  }
+
+  /* =========================
+     PRICE
+  ========================= */
+
+  function price(b, big) {
+    var now = currentPrice(b);
+    var mrp = currentMrp(b);
+
+    var off =
+      mrp && mrp > now
+        ? Math.round((1 - now / mrp) * 100)
+        : 0;
+
+    return (
+      '<div class="price' +
+      (big ? " big" : "") +
+      '">' +
+      (big
+        ? '<p class="plabel">' +
+          esc(SITE.priceLabel) +
+          "</p>"
+        : "") +
+      '<span class="now">' +
+      rs(now) +
+      "</span>" +
+      (off
+        ? "<s>" +
+          rs(mrp) +
+          '</s><span class="off">' +
+          off +
+          "% OFF</span>"
+        : "") +
+      "</div>"
+    );
+  }
+
+  /* =========================
+     BUY BUTTON
+  ========================= */
 
   function buy(b, cls) {
     cls = cls || "btn";
 
     if (!b.checkout) {
-      return '<span class="' + cls + ' off-btn" aria-disabled="true">जल्द उपलब्ध</span>';
+      return (
+        '<span class="' +
+        cls +
+        ' off-btn" aria-disabled="true">जल्द उपलब्ध</span>'
+      );
     }
 
-    return '<button type="button" class="' + cls +
+    return (
+      '<button type="button" class="' +
+      cls +
       ' primary buy-btn" data-product-id="' +
-      esc(b.id) + '">Buy Now</button>';
+      esc(b.id) +
+      '">Buy Now</button>'
+    );
   }
 
+  /* =========================
+     BADGE
+  ========================= */
+
   function card(b) {
-    return '<article class="card">' +
+    return (
+      '<article class="card">' +
       badge(b) +
-      '<a href="' + link(b) + '">' +
-      '<img src="' + esc(b.cover) +
-      '" alt="' + esc(b.title) +
+      '<a href="' +
+      link(b) +
+      '">' +
+      '<img src="' +
+      esc(b.cover) +
+      '" alt="' +
+      esc(b.title) +
       ' — eBook cover" loading="lazy">' +
-      '</a>' +
-      "<h3>" + esc(b.title) + "</h3>" +
-      '<p class="sub">' + esc(b.subtitle) + "</p>" +
-      '<p class="meta">' + esc(b.author) +
-      " · " + b.pages + " पेज</p>" +
+      "</a>" +
+      "<h3>" +
+      esc(b.title) +
+      "</h3>" +
+      '<p class="sub">' +
+      esc(b.subtitle) +
+      "</p>" +
+      '<p class="meta">' +
+      esc(b.author) +
+      " · " +
+      b.pages +
+      " पेज</p>" +
       price(b) +
       '<div class="actions">' +
-      '<a class="btn" href="' + link(b) + '">View Book</a>' +
+      '<a class="btn" href="' +
+      link(b) +
+      '">View Book</a>' +
       buy(b) +
       "</div>" +
-      "</article>";
+      "</article>"
+    );
   }
+
+  /* =========================
+     HOME PAGE
+  ========================= */
 
   function home() {
     var f = BOOKS.filter(function (b) {
@@ -73,20 +206,32 @@
     if (f && fs) {
       fs.innerHTML =
         '<div class="wrap feat">' +
-        '<a class="feat-img" href="' + link(f) + '">' +
-        '<img src="' + esc(f.cover) +
-        '" alt="' + esc(f.title) +
+        '<a class="feat-img" href="' +
+        link(f) +
+        '">' +
+        '<img src="' +
+        esc(f.cover) +
+        '" alt="' +
+        esc(f.title) +
         ' — eBook cover">' +
-        '</a>' +
-        '<div>' +
+        "</a>" +
+        "<div>" +
         '<p class="kicker">Featured Book</p>' +
         badge(f) +
-        "<h2>" + esc(f.title) + "</h2>" +
-        '<p class="sub">' + esc(f.subtitle) + "</p>" +
-        "<p>" + esc(f.desc) + "</p>" +
+        "<h2>" +
+        esc(f.title) +
+        "</h2>" +
+        '<p class="sub">' +
+        esc(f.subtitle) +
+        "</p>" +
+        "<p>" +
+        esc(f.desc) +
+        "</p>" +
         price(f, true) +
         '<div class="actions">' +
-        '<a class="btn" href="' + link(f) + '">View Book</a>' +
+        '<a class="btn" href="' +
+        link(f) +
+        '">View Book</a>' +
         buy(f) +
         "</div>" +
         "</div>" +
@@ -95,27 +240,53 @@
       fs.hidden = true;
     }
 
-    $("#grid").innerHTML = BOOKS.map(card).join("");
+    var grid = $("#grid");
+
+    if (grid) {
+      grid.innerHTML = BOOKS.map(card).join("");
+    }
 
     var hc = $("#herocovers");
 
     if (hc) {
-      hc.innerHTML = BOOKS.slice(0, 4).map(function (b) {
-        return '<img src="' + esc(b.cover) + '" alt="">';
-      }).join("");
+      hc.innerHTML = BOOKS.slice(0, 4)
+        .map(function (b) {
+          return (
+            '<img src="' +
+            esc(b.cover) +
+            '" alt="">'
+          );
+        })
+        .join("");
     }
   }
 
+  /* =========================
+     LIST
+  ========================= */
+
   function list(a) {
-    return "<ul>" +
-      a.map(function (x) {
-        return "<li>" + esc(x) + "</li>";
-      }).join("") +
-      "</ul>";
+    if (!Array.isArray(a)) return "<ul></ul>";
+
+    return (
+      "<ul>" +
+      a
+        .map(function (x) {
+          return "<li>" + esc(x) + "</li>";
+        })
+        .join("") +
+      "</ul>"
+    );
   }
 
+  /* =========================
+     BOOK PAGE
+  ========================= */
+
   function book() {
-    var id = new URLSearchParams(location.search).get("book");
+    var id = new URLSearchParams(location.search).get(
+      "book"
+    );
 
     var b = BOOKS.filter(function (x) {
       return x.id === id;
@@ -123,22 +294,30 @@
 
     var root = $("#book");
 
+    if (!root) return;
+
     if (!b) {
       root.innerHTML =
         '<div class="wrap" style="padding:4rem 0">' +
-        '<h1>यह किताब नहीं मिली</h1>' +
+        "<h1>यह किताब नहीं मिली</h1>" +
         '<p><a class="btn" href="index.html#books">सारी किताबें देखें</a></p>' +
         "</div>";
+
       return;
     }
 
-    document.title = b.title + " — Anjaan Musafir Books";
+    document.title =
+      b.title +
+      " — Anjaan Musafir Books";
 
-    var md = document.querySelector('meta[name="description"]');
+    var md = document.querySelector(
+      'meta[name="description"]'
+    );
 
     if (md) {
       md.content =
-        b.title + " — " +
+        b.title +
+        " — " +
         b.subtitle +
         ". Hindi eBook, Anjaan Musafir Books.";
     }
@@ -148,37 +327,67 @@
       b.preview.enabled &&
       b.preview.pages.length
         ? '<section class="wrap sec">' +
-          '<h2>Preview</h2>' +
+          "<h2>Preview</h2>" +
           '<div class="pv">' +
-          b.preview.pages.map(function (p, i) {
-            return '<img src="' + esc(p) +
-              '" alt="' + esc(b.title) +
-              ' preview ' + (i + 1) +
-              '" loading="lazy">';
-          }).join("") +
+          b.preview.pages
+            .map(function (p, i) {
+              return (
+                '<img src="' +
+                esc(p) +
+                '" alt="' +
+                esc(b.title) +
+                " preview " +
+                (i + 1) +
+                '" loading="lazy">'
+              );
+            })
+            .join("") +
           "</div></section>"
         : "";
 
     var faq = [
-      ["यह eBook किस भाषा में है?", b.language + " में।"],
-      ["eBook कैसे मिलेगी?", "Payhip पर भुगतान पूरा होने के बाद eBook का access/download मिल जाता है। यह Digital PDF है।"],
-      ["क्या refund मिलेगा?", "डिजिटल उत्पाद होने के कारण सामान्य परिस्थितियों में refund, return या cancellation संभव नहीं है। पूरी जानकारी Refund Policy पेज पर है।"],
-      ["भुगतान या access में दिक्कत आए तो?", "हमें " + SITE.email + " पर लिखिए। हम समस्या समझने और हल करने की कोशिश करेंगे।"]
+      [
+        "यह eBook किस भाषा में है?",
+        b.language + " में।"
+      ],
+      [
+        "eBook कैसे मिलेगी?",
+        "Cashfree पर payment सफल होने के बाद payment verify होगा और आपको secure download link मिलेगा। यह Digital PDF है।"
+      ],
+      [
+        "क्या refund मिलेगा?",
+        "डिजिटल उत्पाद होने के कारण सामान्य परिस्थितियों में refund, return या cancellation संभव नहीं है। पूरी जानकारी Refund Policy पेज पर है।"
+      ],
+      [
+        "भुगतान या access में दिक्कत आए तो?",
+        "हमें " +
+          SITE.email +
+          " पर लिखिए। हम समस्या समझने और हल करने की कोशिश करेंगे।"
+      ]
     ];
 
     root.innerHTML =
       '<section class="bhero">' +
       '<div class="wrap bgrid">' +
-      '<img src="' + esc(b.cover) +
-      '" alt="' + esc(b.title) +
+      '<img src="' +
+      esc(b.cover) +
+      '" alt="' +
+      esc(b.title) +
       ' — eBook cover">' +
       "<div>" +
       badge(b) +
-      "<h1>" + esc(b.title) + "</h1>" +
-      '<p class="sub">' + esc(b.subtitle) + "</p>" +
-      '<p class="meta">लेखक: ' + esc(b.author) +
-      " · " + b.pages +
-      " पेज · " + esc(b.language) +
+      "<h1>" +
+      esc(b.title) +
+      "</h1>" +
+      '<p class="sub">' +
+      esc(b.subtitle) +
+      "</p>" +
+      '<p class="meta">लेखक: ' +
+      esc(b.author) +
+      " · " +
+      b.pages +
+      " पेज · " +
+      esc(b.language) +
       "</p>" +
       price(b, true) +
       '<div class="actions">' +
@@ -190,7 +399,9 @@
 
       '<section class="wrap sec narrow">' +
       "<h2>इस किताब के बारे में</h2>" +
-      "<p>" + esc(b.desc) + "</p>" +
+      "<p>" +
+      esc(b.desc) +
+      "</p>" +
       "</section>" +
 
       '<section class="wrap sec narrow">' +
@@ -202,9 +413,11 @@
         ? '<section class="wrap sec narrow">' +
           "<h2>अध्याय</h2>" +
           '<ol class="chaps">' +
-          b.chapters.map(function (c) {
-            return "<li>" + esc(c) + "</li>";
-          }).join("") +
+          b.chapters
+            .map(function (c) {
+              return "<li>" + esc(c) + "</li>";
+            })
+            .join("") +
           "</ol>" +
           "</section>"
         : "") +
@@ -218,16 +431,24 @@
       "<h2>किताब की जानकारी</h2>" +
       "<dl>" +
       "<dt>लेखक</dt>" +
-      "<dd>" + esc(b.author) + "</dd>" +
+      "<dd>" +
+      esc(b.author) +
+      "</dd>" +
       "<dt>पेज</dt>" +
-      "<dd>" + b.pages + "</dd>" +
+      "<dd>" +
+      b.pages +
+      "</dd>" +
       "<dt>भाषा</dt>" +
-      "<dd>" + esc(b.language) + "</dd>" +
+      "<dd>" +
+      esc(b.language) +
+      "</dd>" +
       "<dt>Format</dt>" +
       "<dd>Digital eBook (PDF)</dd>" +
       "</dl>" +
       (b.note
-        ? '<p class="note">' + esc(b.note) + "</p>"
+        ? '<p class="note">' +
+          esc(b.note) +
+          "</p>"
         : "") +
       "</section>" +
 
@@ -235,17 +456,27 @@
 
       '<section class="wrap sec narrow">' +
       "<h2>FAQ</h2>" +
-      faq.map(function (q) {
-        return "<details>" +
-          "<summary>" + esc(q[0]) + "</summary>" +
-          "<p>" + esc(q[1]) + "</p>" +
-          "</details>";
-      }).join("") +
+      faq
+        .map(function (q) {
+          return (
+            "<details>" +
+            "<summary>" +
+            esc(q[0]) +
+            "</summary>" +
+            "<p>" +
+            esc(q[1]) +
+            "</p>" +
+            "</details>"
+          );
+        })
+        .join("") +
       "</section>" +
 
       '<section class="final">' +
       '<div class="wrap">' +
-      "<h2>" + esc(b.title) + "</h2>" +
+      "<h2>" +
+      esc(b.title) +
+      "</h2>" +
       price(b, true) +
       '<div class="actions c">' +
       buy(b) +
@@ -259,7 +490,9 @@
       '<div class="grid">' +
       BOOKS.filter(function (x) {
         return x.id !== b.id;
-      }).map(card).join("") +
+      })
+        .map(card)
+        .join("") +
       "</div>" +
       "</section>" +
 
@@ -269,14 +502,18 @@
       "</div>";
   }
 
+  /* =========================
+     HEADER / FOOTER
+  ========================= */
+
   function chrome() {
     var l = SITE.legal;
 
     $("#foot").innerHTML =
       '<div class="wrap fgrid">' +
-      '<div>' +
+      "<div>" +
       '<p class="brand">ANJAAN MUSAFIR BOOKS</p>' +
-      '<p>हर सफ़र बाहर जाने का नहीं होता।</p>' +
+      "<p>हर सफ़र बाहर जाने का नहीं होता।</p>" +
       "</div>" +
 
       '<nav aria-label="Footer">' +
@@ -289,10 +526,13 @@
       "</nav>" +
 
       "<div>" +
-      '<a href="mailto:' + SITE.email + '">' +
+      '<a href="mailto:' +
+      SITE.email +
+      '">' +
       SITE.email +
       "</a>" +
-      '<a href="' + SITE.instagram +
+      '<a href="' +
+      SITE.instagram +
       '" target="_blank" rel="noopener">Instagram ' +
       SITE.instagramName +
       "</a>" +
@@ -304,26 +544,39 @@
     var m = $("#menu");
     var n = $("#nav");
 
-    m.addEventListener("click", function () {
-      var o = n.classList.toggle("open");
-      m.setAttribute("aria-expanded", o);
-    });
+    if (m && n) {
+      m.addEventListener("click", function () {
+        var o = n.classList.toggle("open");
 
-    n.addEventListener("click", function (e) {
-      if (e.target.tagName === "A") {
-        n.classList.remove("open");
-        m.setAttribute("aria-expanded", false);
-      }
-    });
+        m.setAttribute(
+          "aria-expanded",
+          o
+        );
+      });
+
+      n.addEventListener("click", function (e) {
+        if (e.target.tagName === "A") {
+          n.classList.remove("open");
+
+          m.setAttribute(
+            "aria-expanded",
+            false
+          );
+        }
+      });
+    }
 
     var c = $("#contactlinks");
 
     if (c) {
       c.innerHTML =
-        '<a href="mailto:' + SITE.email + '">' +
+        '<a href="mailto:' +
+        SITE.email +
+        '">' +
         SITE.email +
         "</a>" +
-        '<a href="' + SITE.instagram +
+        '<a href="' +
+        SITE.instagram +
         '" target="_blank" rel="noopener">Instagram ' +
         SITE.instagramName +
         "</a>";
@@ -331,122 +584,188 @@
   }
 
   /* =========================
-     CASHFREE PAYMENT SYSTEM
-     ========================= */
+     CASHFREE BUY
+  ========================= */
 
-  var WORKER_URL =
-    "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev";
+  document.addEventListener(
+    "click",
+    async function (e) {
+      var btn =
+        e.target.closest(".buy-btn");
 
-  var PRODUCT_IDS = {
-    "dimag-ka-shor": "DIMAG_KA_SHOR",
-    "ai-career": "AI_PLUS_CAREER",
-    "aadaton-ke-paar": "AADATON_KE_PAAR",
-    "vicharon-ki-kaid": "VICHARON_KI_KAID",
-    "reality-of-manifestation": "REALITY_OF_MANIFESTATION"
-  };
+      if (!btn) return;
 
-  document.addEventListener("click", async function (e) {
-    var btn = e.target.closest(".buy-btn");
-
-    if (!btn) return;
-
-    var productId = btn.getAttribute("data-product-id");
-    var backendProductId = PRODUCT_IDS[productId];
-
-    if (!backendProductId) {
-      alert("Book not found.");
-      return;
-    }
-
-    var name = prompt("अपना नाम लिखें:");
-    if (name === null) return;
-
-    var email = prompt("अपना Email लिखें:");
-    if (email === null) return;
-
-    var phone = prompt("अपना 10-digit Mobile Number लिखें:");
-    if (phone === null) return;
-
-    name = name.trim();
-    email = email.trim();
-    phone = phone.replace(/\D/g, "");
-
-    if (!email || !email.includes("@")) {
-      alert("कृपया सही Email डालें।");
-      return;
-    }
-
-    if (!/^[6-9]\d{9}$/.test(phone)) {
-      alert("कृपया सही 10-digit Indian Mobile Number डालें।");
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = "Opening Payment...";
-
-    try {
-      var response = await fetch(
-        WORKER_URL + "/api/create-order",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            product_id: backendProductId,
-            name: name,
-            email: email,
-            phone: phone
-          })
-        }
-      );
-
-      var data = await response.json();
-
-      if (!response.ok || !data.payment_session_id) {
-        console.error(data);
-
-        alert(
-          "Payment शुरू नहीं हो सका। कृपया फिर कोशिश करें।"
+      var productId =
+        btn.getAttribute(
+          "data-product-id"
         );
 
-        btn.disabled = false;
-        btn.textContent = "Buy Now";
+      var backendProductId =
+        PRODUCT_IDS[productId];
+
+      if (!backendProductId) {
+        alert("Book not found.");
         return;
       }
 
-      var cashfree = Cashfree({
-        mode: "sandbox"
-      });
+      var name =
+        prompt("अपना नाम लिखें:");
 
-      await cashfree.checkout({
-        paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self"
-      });
+      if (name === null) return;
 
-    } catch (err) {
-      console.error(err);
+      var email =
+        prompt("अपना Email लिखें:");
 
-      alert(
-        "Payment system से connection नहीं हो पाया।"
-      );
+      if (email === null) return;
 
-      btn.disabled = false;
-      btn.textContent = "Buy Now";
+      var phone =
+        prompt(
+          "अपना 10-digit Mobile Number लिखें:"
+        );
+
+      if (phone === null) return;
+
+      name = name.trim();
+      email = email.trim();
+      phone = phone.replace(/\D/g, "");
+
+      if (!name) {
+        alert("कृपया अपना नाम डालें।");
+        return;
+      }
+
+      if (
+        !email ||
+        !email.includes("@")
+      ) {
+        alert(
+          "कृपया सही Email डालें।"
+        );
+        return;
+      }
+
+      if (
+        !/^[6-9]\d{9}$/.test(phone)
+      ) {
+        alert(
+          "कृपया सही 10-digit Indian Mobile Number डालें।"
+        );
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent =
+        "Opening Payment...";
+
+      try {
+        var response =
+          await fetch(
+            WORKER_URL +
+              "/api/create-order",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+              body: JSON.stringify({
+                product_id:
+                  backendProductId,
+                name: name,
+                email: email,
+                phone: phone
+              })
+            }
+          );
+
+        var data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.payment_session_id
+        ) {
+          console.error(data);
+
+          alert(
+            "Payment शुरू नहीं हो सका। कृपया फिर कोशिश करें।"
+          );
+
+          btn.disabled = false;
+          btn.textContent =
+            "Buy Now";
+
+          return;
+        }
+
+        if (
+          typeof Cashfree !==
+          "function"
+        ) {
+          alert(
+            "Payment system load नहीं हुआ। कृपया page refresh करें।"
+          );
+
+          btn.disabled = false;
+          btn.textContent =
+            "Buy Now";
+
+          return;
+        }
+
+        var cashfree =
+          Cashfree({
+            mode: "sandbox"
+          });
+
+        await cashfree.checkout({
+          paymentSessionId:
+            data.payment_session_id,
+          redirectTarget: "_self"
+        });
+
+      } catch (err) {
+        console.error(err);
+
+        alert(
+          "Payment system से connection नहीं हो पाया।"
+        );
+
+        btn.disabled = false;
+        btn.textContent =
+          "Buy Now";
+      }
     }
-  });
+  );
+
+  /* =========================
+     PAYMENT RETURN + VERIFY
+  ========================= */
 
   async function checkPaymentReturn() {
-    var params = new URLSearchParams(location.search);
+    var params =
+      new URLSearchParams(
+        location.search
+      );
 
-    var orderId = params.get("order_id");
-    var paymentReturn = params.get("payment");
+    var orderId =
+      params.get("order_id");
 
-    if (paymentReturn !== "return" || !orderId) {
+    var paymentReturn =
+      params.get("payment");
+
+    if (
+      paymentReturn !==
+        "return" ||
+      !orderId
+    ) {
       return;
     }
 
-    var box = document.createElement("div");
+    var box =
+      document.createElement(
+        "div"
+      );
 
     box.style.cssText =
       "position:fixed;inset:0;background:#101a26;color:white;" +
@@ -462,16 +781,23 @@
     document.body.appendChild(box);
 
     try {
-      var response = await fetch(
-        WORKER_URL +
-        "/api/payment-status?order_id=" +
-        encodeURIComponent(orderId)
-      );
+      var response =
+        await fetch(
+          WORKER_URL +
+            "/api/payment-status?order_id=" +
+            encodeURIComponent(
+              orderId
+            )
+        );
 
-      var data = await response.json();
+      var data =
+        await response.json();
 
-      if (data.status === "PAID" && data.download_url) {
-
+      if (
+        data.status ===
+          "PAID" &&
+        data.download_url
+      ) {
         box.innerHTML =
           "<div>" +
           "<h2>Payment Successful ✅</h2>" +
@@ -481,8 +807,10 @@
           '" style="display:inline-block;padding:14px 22px;background:#b8892e;color:white;text-decoration:none;border-radius:8px;margin-top:15px;">Download eBook</a>' +
           "</div>";
 
-      } else if (data.status === "PENDING") {
-
+      } else if (
+        data.status ===
+        "PENDING"
+      ) {
         box.innerHTML =
           "<div>" +
           "<h2>Payment अभी verify हो रहा है</h2>" +
@@ -490,7 +818,6 @@
           "</div>";
 
       } else {
-
         box.innerHTML =
           "<div>" +
           "<h2>Payment verify नहीं हुआ</h2>" +
@@ -499,7 +826,6 @@
       }
 
     } catch (err) {
-
       console.error(err);
 
       box.innerHTML =
@@ -510,20 +836,27 @@
     }
   }
 
-  checkPaymentReturn();
-
   /* =========================
-     START WEBSITE
-     ========================= */
+     START
+  ========================= */
 
-  chrome();
+  async function start() {
+    chrome();
 
-  var pg = document.body.dataset.page;
+    await loadD1Products();
 
-  if (pg === "home") {
-    home();
-  } else if (pg === "book") {
-    book();
+    var pg =
+      document.body.dataset.page;
+
+    if (pg === "home") {
+      home();
+    } else if (pg === "book") {
+      book();
+    }
+
+    checkPaymentReturn();
   }
+
+  start();
 
 })();
