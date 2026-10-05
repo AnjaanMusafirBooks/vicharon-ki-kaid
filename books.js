@@ -1,228 +1,1075 @@
-/* ANJAAN MUSAFIR BOOKS — सारी किताबों की जानकारी यहीं है।
-   नई किताब जोड़ने के लिए BOOKS में एक और {…} जोड़ें और cover में रखें।
-   checkout: अब Cashfree/Worker backend का URL है।
-   featured: सिर्फ़ एक किताब पर true रखें। popular: जिन पर badge चाहिए उन पर true।
-   preview: बाद में enabled:true और pages में image paths डालकर चालू करें (अभी बंद)। */
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
 
-const SITE = {
-  email: "officialsuperswagg@gmail.com",
-  instagram: "https://www.instagram.com/anjaanmusafirbooks",
-  instagramName: "@anjaanmusafirbooks",
-  priceLabel: "EXCLUSIVE EBOOK PRICE",
-  legal: {
-    privacy: "https://anjaanmusafirbooks.github.io/vicharon-ki-kaid/privacy.html",
-    terms: "https://anjaanmusafirbooks.github.io/vicharon-ki-kaid/terms.html",
-    refund: "https://anjaanmusafirbooks.github.io/vicharon-ki-kaid/refund.html",
-    contact: "https://anjaanmusafirbooks.github.io/vicharon-ki-kaid/contact.html"
+  var esc = function (t) {
+    return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c];
+    });
+  };
+
+  var rs = function (n) {
+    return "₹" + n;
+  };
+
+  /* =========================
+     CLOUDFLARE WORKER
+  ========================= */
+
+  var WORKER_URL =
+    "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev";
+
+  var PRODUCT_IDS = {
+    "dimag-ka-shor": "DIMAG_KA_SHOR",
+    "ai-career": "AI_PLUS_CAREER",
+    "aadaton-ke-paar": "AADATON_KE_PAAR",
+    "vicharon-ki-kaid": "VICHARON_KI_KAID",
+    "reality-of-manifestation": "REALITY_OF_MANIFESTATION"
+  };
+
+  /* =========================
+     BOOK LINK
+  ========================= */
+
+  function link(b) {
+    return "book.html?book=" + encodeURIComponent(b.id);
   }
-};
 
-const BOOKS = [
-  {
-    id: "dimag-ka-shor",
-    title: "दिमाग़ का शोर",
-    subtitle: "Overthinking को समझें, रोकें और ख़ुद को बेहतर बनाएँ",
-    author: "Nitendra Sahu",
-    pages: 100,
-    language: "हिंदी",
-    price: 129,
-    mrp: 399,
-    cover: "dimag-ka-shor.jpg",
-    checkout: "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev",
-    featured: true,
-    popular: true,
-    desc: "रात को एक ही बात बार-बार दिमाग़ में घूमती रहे, तो यह किताब उसे समझने से शुरू करती है। पहले समझना, फिर पकड़ना, फिर रोकना और आख़िर में रोज़ का एक आसान system बनाना।",
-    inside: [
-      "Overthinking क्या है और क्यों होती है",
-      "Triggers और दिमाग़ की सोचने की ग़लतियाँ",
-      "Loop तोड़ने की तुरंत तकनीकें और Decision Framework",
-      "Worksheets, 21-दिन का Reset Plan और Final Action Plan"
-    ],
-    chapters: [
-      "भूमिका: रात के 2 बजे का वो सवाल",
-      "वो आवाज़ जो बंद नहीं होती",
-      "दिमाग़ ऐसा क्यों करता है",
-      "Overthinking के चार चेहरे",
-      "Overthinking की असली क़ीमत",
-      "Triggers: शोर कब और क्यों शुरू होता है",
-      "विचार बनाम तथ्य: दिमाग़ की दस चालें",
-      "आपकी Overthinking Profile",
-      "Loop तोड़ने की पाँच तुरंत तकनीकें",
-      "सोच से फ़ैसले तक: Decision Framework",
-      "Worry Time, Journaling और CBT के औज़ार",
-      "शरीर से शुरू करें: Mindfulness और Reset",
-      "Perfectionism, तुलना और भीतर की आवाज़",
-      "रोज़ का System: शोर कम रखने की आदतें",
-      "21-दिन का Reset Plan",
-      "आपका Final Action Plan"
-    ],
-    forWho: [
-      "जो छोटी बातों को बार-बार सोचते हैं",
-      "जिन्हें फ़ैसला लेने में बहुत समय लगता है",
-      "जो रोज़ के लिए एक सरल तरीका चाहते हैं"
-    ],
-    note: "यह किताब शैक्षिक और self-improvement के लिए है। यह डॉक्टर या therapist की सलाह का विकल्प नहीं है।",
-    preview: {
-      enabled: false,
-      pages: []
+  /* =========================
+     BOOK BADGE
+  ========================= */
+
+  function badge(b) {
+    if (b.featured) {
+      return '<span class="badge">Featured</span>';
     }
-  },
 
-  {
-    id: "ai-career",
-    title: "AI + Career",
-    subtitle: "नए दौर में अपने लिए बेहतर करियर बनाने की व्यावहारिक मार्गदर्शिका",
-    author: "Nitendra Sahu",
-    pages: 70,
-    language: "हिंदी",
-    price: 99,
-    mrp: 299,
-    cover: "ai-career.jpg",
-    checkout: "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev",
-    featured: false,
-    popular: true,
-    desc: "AI से डरने की जगह उसे समझने और अपने काम में इस्तेमाल करने की सीधी गाइड। किताब में आसान उदाहरण हैं और हर अध्याय के अंत में एक छोटा काम, जो आप उसी दिन कर सकते हैं।",
-    inside: [
-      "AI असल में कैसे काम करता है",
-      "कौन-से काम बदलेंगे और कौन-सी Skills काम आएँगी",
-      "AI से बात करने की कला (Prompting) और AI Toolkit",
-      "कमाई के रास्ते, Resume और LinkedIn, 90 दिन का Roadmap"
-    ],
-    forWho: [
-      "विद्यार्थी और Freshers",
-      "नौकरी करने वाले लोग",
-      "Freelancers, छोटे business वाले और करियर बदलने वाले"
-    ],
-    note: "इसमें कमाई या नौकरी के नतीजों की कोई गारंटी नहीं दी गई है। नतीजे हर व्यक्ति के लिए अलग हो सकते हैं।",
-    preview: {
-      enabled: false,
-      pages: []
+    if (b.popular) {
+      return '<span class="badge">Popular</span>';
     }
-  },
 
-  {
-    id: "aadaton-ke-paar",
-    title: "आदतों के पार",
-    subtitle: "अनुशासन, फोकस और निरंतरता की वह यात्रा, जो आदतों से आगे जाती है",
-    author: "Nitendra Sahu",
-    pages: 113,
-    language: "हिंदी",
-    price: 129,
-    mrp: 399,
-    cover: "aadaton-ke-paar.jpg",
-    checkout: "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev",
-    featured: false,
-    popular: false,
-    desc: "हम जानते हैं कि क्या करना चाहिए, फिर भी नहीं कर पाते। यह किताब आदत के साथ पहचान, स्पष्टता, ध्यान और वापस लौटने की कला पर बात करती है।",
-    inside: [
-      "आदत का भ्रम और अनुशासन की असली परिभाषा",
-      "पहचान, स्पष्टता और ऊर्जा का प्रबंधन",
-      "फोकस, समय, टालमटोल और वातावरण",
-      "असफलता से वापसी, 30 दिन की योजना और Templates"
-    ],
-    chapters: [
-      "आदत का भ्रम",
-      "अनुशासन की असली परिभाषा",
-      "पहचान: आप कौन बनना चाहते हैं",
-      "स्पष्टता: लक्ष्य से सिस्टम तक",
-      "ऊर्जा का प्रबंधन",
-      "ध्यान और फोकस: शोर के पार",
-      "समय और प्राथमिकता",
-      "टालमटोल और प्रतिरोध",
-      "वातावरण और संगत की ताकत",
-      "असफलता, गिरावट और वापसी",
-      "निरंतरता का विज्ञान",
-      "आदतों के पार: स्वतंत्रता",
-      "30 दिन की योजना",
-      "टेम्पलेट और चेकलिस्ट"
-    ],
-    forWho: [
-      "जो बार-बार शुरू करके छोड़ देते हैं",
-      "जो फोकस और समय सँभालना चाहते हैं",
-      "जो सिर्फ़ आदत नहीं, सोच-समझकर जीना चाहते हैं"
-    ],
-    note: "यह किताब सामान्य जानकारी के लिए है। नींद, स्वास्थ्य या मानसिक स्वास्थ्य की गंभीर समस्या में योग्य डॉक्टर से मिलें।",
-    preview: {
-      enabled: false,
-      pages: []
+    return "";
+  }
+
+  /* =========================
+     D1 PRODUCT DATA
+  ========================= */
+
+  var D1_PRODUCTS = {};
+
+  async function loadD1Products() {
+    if (typeof BOOKS === "undefined") {
+      console.error("BOOKS data not found.");
+      return;
     }
-  },
 
-  {
-    id: "vicharon-ki-kaid",
-    title: "विचारों की कैद",
-    subtitle: "जब अपने ही विचार इंसान को भीतर से बाँधने लगें",
-    author: "अनजान मुसाफ़िर",
-    pages: 119,
-    language: "हिंदी",
-    price: 49,
-    mrp: 499,
-    cover: "vicharon-ki-kaid.jpg",
-    checkout: "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev",
-    featured: false,
-    popular: false,
-    desc: "यह किताब आपके विचारों को चुप कराने का वादा नहीं करती। यह उन्हें थोड़ा बेहतर समझने की एक यात्रा है: Overthinking, डर, बीती बातें और आने वाले कल की चिंता के बीच से।",
-    inside: [
-      "Overthinking और मन के दोहराव वाले पैटर्न",
-      "डर, अतीत और भविष्य की चिंता",
-      "Perfectionism, तुलना और control को समझना",
-      "20 अध्याय, 21-Day Mind Practice और एक Mind System"
-    ],
-    forWho: [
-      "जो छोटी बातों को बार-बार सोचते हैं",
-      "जिनका मन अक्सर बीते कल या आने वाले कल में चला जाता है",
-      "जो अपने विचारों को थोड़ा बेहतर समझना चाहते हैं"
-    ],
-    note: "यह किताब आत्मचिंतन और personal development के लिए है। यह किसी मानसिक स्वास्थ्य स्थिति के निदान या इलाज का विकल्प नहीं है।",
-    preview: {
-      enabled: false,
-      pages: []
+    await Promise.all(
+      BOOKS.map(async function (b) {
+        var backendId = PRODUCT_IDS[b.id];
+
+        if (!backendId) return;
+
+        try {
+          var response = await fetch(
+            WORKER_URL +
+              "/api/product?product_id=" +
+              encodeURIComponent(backendId),
+            {
+              method: "GET",
+              cache: "no-store"
+            }
+          );
+
+          if (!response.ok) return;
+
+          var data = await response.json();
+
+          if (data && data.price != null) {
+            D1_PRODUCTS[b.id] = data;
+          }
+
+        } catch (err) {
+          console.warn(
+            "D1 product load failed:",
+            b.id,
+            err
+          );
+        }
+      })
+    );
+  }
+
+  function currentPrice(b) {
+    if (
+      D1_PRODUCTS[b.id] &&
+      D1_PRODUCTS[b.id].price != null
+    ) {
+      return Number(D1_PRODUCTS[b.id].price);
     }
-  },
 
-  {
-    id: "reality-of-manifestation",
-    title: "The Reality of Manifestation",
-    subtitle: "Turn Your Intentions Into Reality.",
-    author: "Nitendra Sahu",
-    pages: 69,
-    language: "English",
-    price: 99,
-    mrp: 299,
-    cover: "reality-of-manifestation.jpg",
-    checkout: "https://anjaan-musafir-delivery.officialsuperswagg.workers.dev",
-    featured: false,
-    popular: false,
-    desc: "Manifestation को सिर्फ़ सोचने तक सीमित न रखकर, इसे साफ़ इरादे, सही कदम और धैर्य से जोड़ने वाली किताब। इसमें R.E.A.L. Method समझाया गया है। (किताब English में है।)",
-    inside: [
-      "Manifestation की सच्चाई और दिमाग़ कैसे काम करता है",
-      "Clarity और Intention Statement",
-      "Limiting Beliefs, Visualization, Emotions और Energy",
-      "Action, Habits, Fear, Environment और Blueprint Templates"
-    ],
-    chapters: [
-      "The Truth About Manifestation",
-      "How the Mind Works",
-      "Clarity",
-      "The Intention Statement",
-      "Limiting Beliefs",
-      "Visualization",
-      "Emotions & Energy",
-      "Action",
-      "Habits & Consistency",
-      "Fear & Procrastination",
-      "Environment & People",
-      "Review & Patience"
-    ],
-    forWho: [
-      "जो अपने लक्ष्य को साफ़ करना चाहते हैं",
-      "जो सोच के साथ कदम भी जोड़ना चाहते हैं",
-      "जिन्हें English में पढ़ना आसान लगता है"
-    ],
-    note: "यह किताब सामान्य जानकारी और प्रेरणा के लिए है। किसी नतीजे की गारंटी नहीं है।",
-    preview: {
-      enabled: false,
-      pages: []
+    return Number(b.price);
+  }
+
+  function currentMrp(b) {
+    return Number(b.mrp || 0);
+  }
+
+  /* =========================
+     PRICE
+  ========================= */
+
+  function price(b, big) {
+    var now = currentPrice(b);
+    var mrp = currentMrp(b);
+
+    var off =
+      mrp && mrp > now
+        ? Math.round((1 - now / mrp) * 100)
+        : 0;
+
+    return '<div class="price' +
+      (big ? " big" : "") +
+      '">' +
+
+      (big
+        ? '<p class="plabel">' +
+          esc(SITE.priceLabel) +
+          "</p>"
+        : "") +
+
+      '<span class="now">' +
+      rs(now) +
+      "</span>" +
+
+      (off
+        ? '<s>' +
+          rs(mrp) +
+          '</s><span class="off">' +
+          off +
+          "% OFF</span>"
+        : "") +
+
+      "</div>";
+  }
+
+  /* =========================
+     BUY BUTTON
+  ========================= */
+
+  function buy(b, cls) {
+    cls = cls || "btn";
+
+    if (!b.checkout) {
+      return '<span class="' +
+        cls +
+        ' off-btn" aria-disabled="true">जल्द उपलब्ध</span>';
+    }
+
+    return '<button type="button" class="' +
+      cls +
+      ' primary buy-btn" data-product-id="' +
+      esc(b.id) +
+      '">Buy Now</button>';
+  }
+
+  /* =========================
+     BOOK CARD
+  ========================= */
+
+  function card(b) {
+    return '<article class="card">' +
+
+      badge(b) +
+
+      '<a href="' +
+      link(b) +
+      '">' +
+
+      '<img src="' +
+      esc(b.cover) +
+      '" alt="' +
+      esc(b.title) +
+      ' — eBook cover" loading="lazy">' +
+
+      "</a>" +
+
+      "<h3>" +
+      esc(b.title) +
+      "</h3>" +
+
+      '<p class="sub">' +
+      esc(b.subtitle) +
+      "</p>" +
+
+      '<p class="meta">' +
+      esc(b.author) +
+      " · " +
+      b.pages +
+      " पेज</p>" +
+
+      price(b) +
+
+      '<div class="actions">' +
+
+      '<a class="btn" href="' +
+      link(b) +
+      '">View Book</a>' +
+
+      buy(b) +
+
+      "</div>" +
+
+      "</article>";
+  }
+
+  /* =========================
+     HOME PAGE
+  ========================= */
+
+  function home() {
+    var f = BOOKS.filter(function (b) {
+      return b.featured;
+    })[0];
+
+    var fs = $("#featured");
+
+    if (f && fs) {
+      fs.innerHTML =
+        '<div class="wrap feat">' +
+
+        '<a class="feat-img" href="' +
+        link(f) +
+        '">' +
+
+        '<img src="' +
+        esc(f.cover) +
+        '" alt="' +
+        esc(f.title) +
+        ' — eBook cover">' +
+
+        "</a>" +
+
+        "<div>" +
+
+        '<p class="kicker">Featured Book</p>' +
+
+        badge(f) +
+
+        "<h2>" +
+        esc(f.title) +
+        "</h2>" +
+
+        '<p class="sub">' +
+        esc(f.subtitle) +
+        "</p>" +
+
+        "<p>" +
+        esc(f.desc) +
+        "</p>" +
+
+        price(f, true) +
+
+        '<div class="actions">' +
+
+        '<a class="btn" href="' +
+        link(f) +
+        '">View Book</a>' +
+
+        buy(f) +
+
+        "</div>" +
+
+        "</div>" +
+
+        "</div>";
+
+    } else if (fs) {
+      fs.hidden = true;
+    }
+
+    var grid = $("#grid");
+
+    if (grid) {
+      grid.innerHTML =
+        BOOKS.map(card).join("");
+    }
+
+    var hc = $("#herocovers");
+
+    if (hc) {
+      hc.innerHTML =
+        BOOKS.slice(0, 4)
+          .map(function (b) {
+            return '<img src="' +
+              esc(b.cover) +
+              '" alt="">';
+          })
+          .join("");
     }
   }
-];
+
+  /* =========================
+     LIST
+  ========================= */
+
+  function list(a) {
+    if (!Array.isArray(a)) {
+      return "<ul></ul>";
+    }
+
+    return "<ul>" +
+
+      a.map(function (x) {
+        return "<li>" +
+          esc(x) +
+          "</li>";
+      }).join("") +
+
+      "</ul>";
+  }
+
+  /* =========================
+     BOOK DETAIL PAGE
+  ========================= */
+
+  function book() {
+    var id =
+      new URLSearchParams(
+        location.search
+      ).get("book");
+
+    var b =
+      BOOKS.filter(function (x) {
+        return x.id === id;
+      })[0];
+
+    var root = $("#book");
+
+    if (!root) return;
+
+    if (!b) {
+      root.innerHTML =
+        '<div class="wrap" style="padding:4rem 0">' +
+        "<h1>यह किताब नहीं मिली</h1>" +
+        '<p><a class="btn" href="index.html#books">सारी किताबें देखें</a></p>' +
+        "</div>";
+
+      return;
+    }
+
+    document.title =
+      b.title +
+      " — Anjaan Musafir Books";
+
+    var md =
+      document.querySelector(
+        'meta[name="description"]'
+      );
+
+    if (md) {
+      md.content =
+        b.title +
+        " — " +
+        b.subtitle +
+        ". Hindi eBook, Anjaan Musafir Books.";
+    }
+
+    var pv =
+      b.preview &&
+      b.preview.enabled &&
+      b.preview.pages.length
+        ? '<section class="wrap sec">' +
+
+          "<h2>Preview</h2>" +
+
+          '<div class="pv">' +
+
+          b.preview.pages
+            .map(function (p, i) {
+              return '<img src="' +
+                esc(p) +
+                '" alt="' +
+                esc(b.title) +
+                " preview " +
+                (i + 1) +
+                '" loading="lazy">';
+            })
+            .join("") +
+
+          "</div>" +
+
+          "</section>"
+
+        : "";
+
+    var faq = [
+      [
+        "यह eBook किस भाषा में है?",
+        b.language + " में।"
+      ],
+
+      [
+        "eBook कैसे मिलेगी?",
+        "Cashfree पर payment सफल होने के बाद payment verify होगा और आपको secure download link मिलेगा। यह Digital PDF है।"
+      ],
+
+      [
+        "क्या refund मिलेगा?",
+        "डिजिटल उत्पाद होने के कारण सामान्य परिस्थितियों में refund, return या cancellation संभव नहीं है। पूरी जानकारी Refund Policy पेज पर है।"
+      ],
+
+      [
+        "भुगतान या access में दिक्कत आए तो?",
+        "हमें " +
+        SITE.email +
+        " पर लिखिए। हम समस्या समझने और हल करने की कोशिश करेंगे।"
+      ]
+    ];
+
+    root.innerHTML =
+
+      '<section class="bhero">' +
+
+      '<div class="wrap bgrid">' +
+
+      '<img src="' +
+      esc(b.cover) +
+      '" alt="' +
+      esc(b.title) +
+      ' — eBook cover">' +
+
+      "<div>" +
+
+      badge(b) +
+
+      "<h1>" +
+      esc(b.title) +
+      "</h1>" +
+
+      '<p class="sub">' +
+      esc(b.subtitle) +
+      "</p>" +
+
+      '<p class="meta">लेखक: ' +
+      esc(b.author) +
+      " · " +
+      b.pages +
+      " पेज · " +
+      esc(b.language) +
+      "</p>" +
+
+      price(b, true) +
+
+      '<div class="actions">' +
+      buy(b) +
+      "</div>" +
+
+      "</div>" +
+
+      "</div>" +
+
+      "</section>" +
+
+      '<section class="wrap sec narrow">' +
+      "<h2>इस किताब के बारे में</h2>" +
+      "<p>" +
+      esc(b.desc) +
+      "</p>" +
+      "</section>" +
+
+      '<section class="wrap sec narrow">' +
+      "<h2>किताब के अंदर क्या है</h2>" +
+      list(b.inside) +
+      "</section>" +
+
+      (b.chapters
+        ? '<section class="wrap sec narrow">' +
+          "<h2>अध्याय</h2>" +
+          '<ol class="chaps">' +
+
+          b.chapters
+            .map(function (c) {
+              return "<li>" +
+                esc(c) +
+                "</li>";
+            })
+            .join("") +
+
+          "</ol>" +
+          "</section>"
+        : "") +
+
+      '<section class="wrap sec narrow">' +
+      "<h2>यह किताब किसके लिए है</h2>" +
+      list(b.forWho) +
+      "</section>" +
+
+      '<section class="wrap sec narrow">' +
+      "<h2>किताब की जानकारी</h2>" +
+
+      "<dl>" +
+
+      "<dt>लेखक</dt>" +
+      "<dd>" +
+      esc(b.author) +
+      "</dd>" +
+
+      "<dt>पेज</dt>" +
+      "<dd>" +
+      b.pages +
+      "</dd>" +
+
+      "<dt>भाषा</dt>" +
+      "<dd>" +
+      esc(b.language) +
+      "</dd>" +
+
+      "<dt>Format</dt>" +
+      "<dd>Digital eBook (PDF)</dd>" +
+
+      "</dl>" +
+
+      (b.note
+        ? '<p class="note">' +
+          esc(b.note) +
+          "</p>"
+        : "") +
+
+      "</section>" +
+
+      pv +
+
+      '<section class="wrap sec narrow">' +
+
+      "<h2>FAQ</h2>" +
+
+      faq.map(function (q) {
+        return "<details>" +
+
+          "<summary>" +
+          esc(q[0]) +
+          "</summary>" +
+
+          "<p>" +
+          esc(q[1]) +
+          "</p>" +
+
+          "</details>";
+
+      }).join("") +
+
+      "</section>" +
+
+      '<section class="final">' +
+
+      '<div class="wrap">' +
+
+      "<h2>" +
+      esc(b.title) +
+      "</h2>" +
+
+      price(b, true) +
+
+      '<div class="actions c">' +
+
+      buy(b) +
+
+      '<a class="btn light" href="index.html#books">और किताबें</a>' +
+
+      "</div>" +
+
+      "</div>" +
+
+      "</section>" +
+
+      '<section class="wrap sec">' +
+
+      "<h2>और किताबें</h2>" +
+
+      '<div class="grid">' +
+
+      BOOKS
+        .filter(function (x) {
+          return x.id !== b.id;
+        })
+        .map(card)
+        .join("") +
+
+      "</div>" +
+
+      "</section>" +
+
+      '<div class="sticky">' +
+
+      price(b) +
+
+      buy(b) +
+
+      "</div>";
+  }
+
+  /* =========================
+     HEADER / FOOTER
+  ========================= */
+
+  function chrome() {
+    var l = SITE.legal;
+
+    var foot = $("#foot");
+
+    if (foot) {
+      foot.innerHTML =
+        '<div class="wrap fgrid">' +
+
+        "<div>" +
+
+        '<p class="brand">ANJAAN MUSAFIR BOOKS</p>' +
+
+        "<p>हर सफ़र बाहर जाने का नहीं होता।</p>" +
+
+        "</div>" +
+
+        '<nav aria-label="Footer">' +
+
+        '<a href="index.html#books">Books</a>' +
+        '<a href="index.html#about">About</a>' +
+        '<a href="contact.html">Contact</a>' +
+        '<a href="privacy.html">Privacy Policy</a>' +
+        '<a href="terms.html">Terms &amp; Conditions</a>' +
+        '<a href="refund.html">Refund Policy</a>' +
+
+        "</nav>" +
+
+        "<div>" +
+
+        '<a href="mailto:' +
+        SITE.email +
+        '">' +
+        SITE.email +
+        "</a>" +
+
+        '<a href="' +
+        SITE.instagram +
+        '" target="_blank" rel="noopener">Instagram ' +
+        SITE.instagramName +
+        "</a>" +
+
+        "</div>" +
+
+        "</div>" +
+
+        '<p class="wrap copy">© 2026 Anjaan Musafir Books · Owned &amp; Operated by Nitendra Sahu · All Rights Reserved.</p>';
+    }
+
+    var m = $("#menu");
+    var n = $("#nav");
+
+    if (m && n) {
+
+      m.addEventListener(
+        "click",
+        function () {
+          var o =
+            n.classList.toggle(
+              "open"
+            );
+
+          m.setAttribute(
+            "aria-expanded",
+            o
+          );
+        }
+      );
+
+      n.addEventListener(
+        "click",
+        function (e) {
+
+          if (
+            e.target.tagName ===
+            "A"
+          ) {
+
+            n.classList.remove(
+              "open"
+            );
+
+            m.setAttribute(
+              "aria-expanded",
+              false
+            );
+          }
+
+        }
+      );
+    }
+
+    var c =
+      $("#contactlinks");
+
+    if (c) {
+      c.innerHTML =
+        '<a href="mailto:' +
+        SITE.email +
+        '">' +
+        SITE.email +
+        "</a>" +
+
+        '<a href="' +
+        SITE.instagram +
+        '" target="_blank" rel="noopener">Instagram ' +
+        SITE.instagramName +
+        "</a>";
+    }
+  }
+
+  /* =========================
+     CASHFREE BUY
+  ========================= */
+
+  document.addEventListener(
+    "click",
+    async function (e) {
+
+      var btn =
+        e.target.closest(
+          ".buy-btn"
+        );
+
+      if (!btn) return;
+
+      var productId =
+        btn.getAttribute(
+          "data-product-id"
+        );
+
+      var backendProductId =
+        PRODUCT_IDS[
+          productId
+        ];
+
+      if (!backendProductId) {
+        alert(
+          "Book not found."
+        );
+        return;
+      }
+
+      var name =
+        prompt(
+          "अपना नाम लिखें:"
+        );
+
+      if (name === null)
+        return;
+
+      var email =
+        prompt(
+          "अपना Email लिखें:"
+        );
+
+      if (email === null)
+        return;
+
+      var phone =
+        prompt(
+          "अपना 10-digit Mobile Number लिखें:"
+        );
+
+      if (phone === null)
+        return;
+
+      name = name.trim();
+      email = email.trim();
+      phone =
+        phone.replace(
+          /\D/g,
+          ""
+        );
+
+      if (!name) {
+        alert(
+          "कृपया अपना नाम डालें।"
+        );
+        return;
+      }
+
+      if (
+        !email ||
+        !email.includes("@")
+      ) {
+        alert(
+          "कृपया सही Email डालें।"
+        );
+        return;
+      }
+
+      if (
+        !/^[6-9]\d{9}$/.test(
+          phone
+        )
+      ) {
+        alert(
+          "कृपया सही 10-digit Indian Mobile Number डालें।"
+        );
+        return;
+      }
+
+      btn.disabled = true;
+
+      btn.textContent =
+        "Opening Payment...";
+
+      try {
+
+        var response =
+          await fetch(
+            WORKER_URL +
+              "/api/create-order",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify({
+                  product_id:
+                    backendProductId,
+                  name: name,
+                  email: email,
+                  phone: phone
+                })
+            }
+          );
+
+        var data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.payment_session_id
+        ) {
+
+          console.error(data);
+
+          alert(
+            "Payment शुरू नहीं हो सका। कृपया फिर कोशिश करें।"
+          );
+
+          btn.disabled =
+            false;
+
+          btn.textContent =
+            "Buy Now";
+
+          return;
+        }
+
+        if (
+          typeof Cashfree !==
+          "function"
+        ) {
+
+          alert(
+            "Payment system load नहीं हुआ। कृपया page refresh करें।"
+          );
+
+          btn.disabled =
+            false;
+
+          btn.textContent =
+            "Buy Now";
+
+          return;
+        }
+
+        var cashfree =
+          Cashfree({
+            mode: "sandbox"
+          });
+
+        await cashfree.checkout({
+          paymentSessionId:
+            data.payment_session_id,
+
+          redirectTarget:
+            "_self"
+        });
+
+      } catch (err) {
+
+        console.error(err);
+
+        alert(
+          "Payment system से connection नहीं हो पाया।"
+        );
+
+        btn.disabled =
+          false;
+
+        btn.textContent =
+          "Buy Now";
+      }
+    }
+  );
+
+  /* =========================
+     PAYMENT RETURN
+  ========================= */
+
+  async function checkPaymentReturn() {
+
+    var params =
+      new URLSearchParams(
+        location.search
+      );
+
+    var orderId =
+      params.get(
+        "order_id"
+      );
+
+    var paymentReturn =
+      params.get(
+        "payment"
+      );
+
+    if (
+      paymentReturn !==
+        "return" ||
+      !orderId
+    ) {
+      return;
+    }
+
+    var box =
+      document.createElement(
+        "div"
+      );
+
+    box.style.cssText =
+      "position:fixed;inset:0;background:#101a26;color:white;" +
+      "display:flex;align-items:center;justify-content:center;" +
+      "z-index:99999;padding:24px;text-align:center;font-family:Arial,sans-serif;";
+
+    box.innerHTML =
+      "<div>" +
+
+      "<h2>Payment verify हो रहा है...</h2>" +
+
+      "<p>कृपया कुछ सेकंड इंतज़ार करें।</p>" +
+
+      "</div>";
+
+    document.body.appendChild(
+      box
+    );
+
+    try {
+
+      var response =
+        await fetch(
+          WORKER_URL +
+            "/api/payment-status?order_id=" +
+            encodeURIComponent(
+              orderId
+            )
+        );
+
+      var data =
+        await response.json();
+
+      if (
+        data.status ===
+          "PAID" &&
+        data.download_url
+      ) {
+
+        box.innerHTML =
+          "<div>" +
+
+          "<h2>Payment Successful ✅</h2>" +
+
+          "<p>आपकी eBook तैयार है।</p>" +
+
+          '<a href="' +
+          data.download_url +
+          '" style="display:inline-block;padding:14px 22px;background:#b8892e;color:white;text-decoration:none;border-radius:8px;margin-top:15px;">Download eBook</a>' +
+
+          "</div>";
+
+      } else if (
+        data.status ===
+        "PENDING"
+      ) {
+
+        box.innerHTML =
+          "<div>" +
+
+          "<h2>Payment अभी verify हो रहा है</h2>" +
+
+          "<p>कुछ सेकंड बाद फिर कोशिश करें।</p>" +
+
+          "</div>";
+
+      } else {
+
+        box.innerHTML =
+          "<div>" +
+
+          "<h2>Payment verify नहीं हुआ</h2>" +
+
+          "<p>अगर payment से पैसे कटे हैं तो दोबारा payment न करें।</p>" +
+
+          "</div>";
+      }
+
+    } catch (err) {
+
+      console.error(err);
+
+      box.innerHTML =
+        "<div>" +
+
+        "<h2>Verification में समस्या हुई</h2>" +
+
+        "<p>कृपया कुछ देर बाद फिर कोशिश करें।</p>" +
+
+        "</div>";
+    }
+  }
+
+  /* =========================
+     START WEBSITE
+  ========================= */
+
+  async function start() {
+
+    chrome();
+
+    await loadD1Products();
+
+    var pg =
+      document.body.dataset.page;
+
+    if (pg === "home") {
+      home();
+
+    } else if (pg === "book") {
+      book();
+    }
+
+    checkPaymentReturn();
+  }
+
+  start();
+
+})();
