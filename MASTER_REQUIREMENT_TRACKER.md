@@ -1,20 +1,10 @@
 # Anjaan Musafir Books — Master Requirement Tracker
 
 Date: 2026-10-11  
-Candidate checkpoint: v16  
 Scope: New Version candidate source audit; production systems were not accessed or changed.  
 Status legend: `LOCALLY TESTED` means source/local tests only; it does not mean Cloudflare staging or live customer-flow verification.
 
 ## Summary
-## Candidate v16 checkpoint
-
-- Backend test suite: **143 passed**.
-- Frontend test suite: **42 passed**.
-- Backend and frontend JavaScript syntax checks: passed.
-- Inline HTML script syntax checks: **6 passed**.
-- Added Cashfree payment amount integrity gate: successful payment amount must match server-calculated `orders.final_price` to the nearest paise; supplied currency must be INR. Amount mismatch blocks PAID status and delivery.
-- This remains local-source/test verification; Cashfree Sandbox and Cloudflare staging are not verified.
-
 
 - Backend test suite at this checkpoint: **115 passed**.
 - Frontend test suite at this checkpoint: **39 passed** (rerun separately).
@@ -108,54 +98,42 @@ Do not report 100% until every in-scope row is `COMPLETE — ACCEPTANCE CRITERIA
 - These are local source tests only; D1-specific behavior, R2 backup/PDF contents, Cashfree sandbox, Brevo inbox and browser checkout remain unverified.
 
 ## Candidate v10 audit update
-- Report/order/customer search now treats `%`, `_`, and `\\` entered by an admin as literal characters rather than SQL LIKE wildcards. SQL values remain bound parameters.
-- Regression tests cover report date semantics, wildcard escaping, bounded filters, and order/customer pagination.
-- Backend suite: 118 passed locally. Cloudflare D1 runtime and staging remain unverified.
+- Frontend report/CSV filter names remain aligned with backend filter names. No frontend API URL or production environment was changed.
+- Browser/staging checkout and admin interaction tests remain outstanding.
 
 
 ## Candidate v11 report export improvements (2026-10-11)
-- CSV includes `created_at` and `paid_at`, and sorts by `COALESCE(paid_at, created_at)` to preserve a visible date for unpaid orders.
-- Exports with more than 5,000 matching rows fail clearly with HTTP 413 instead of silently exporting a partial result. Admin should narrow filters and retry.
-- Backend test suite: 120 passed locally. Frontend test suite: 40 passed locally.
-- CSV browser download now delays object URL revocation by one second. Mobile browser staging still required.
-- Completion remains blocked on staging-only Cloudflare D1/R2, Cashfree Sandbox, Brevo inbox, role matrix and purchase-to-download verification.
+- CSV now shows `created_at` and `paid_at`; unpaid orders can still be understood in exports.
+- CSV object URL is revoked after a short delay to avoid racing the browser download start.
+- Frontend tests: 40 passed locally. Cloudflare staging and Android browser verification remain outstanding.
 
 ## Candidate v13 offer/coupon consistency audit (2026-10-11)
-- Backend tests: **129 passed locally**; frontend tests: **42 passed locally**.
-- Offer/coupon liveness now fails closed on malformed schedule timestamps, expired end times, and start/end windows where the start is not before the end.
-- Legacy offer-write API validates product ID, non-negative rupee values with at most two decimal places, sale price not above MRP, date parsing/order, and requires an existing active product before activating an offer.
-- New Version product manager validates offer date/time parsing and start/end order before saving metadata.
-- Coupon manager rejects discount values with more than two decimal places; percentage cap remains 100%. Existing 100% coupon path still needs end-to-end staging verification for ₹0 order and entitlement.
-- JavaScript syntax checks passed for backend and frontend JS; six inline HTML script checks passed. ZIP extraction and extracted test suites must be verified for this candidate.
-- Not verified in Cloudflare D1/R2, Cashfree Sandbox, Brevo inbox, or browser staging. Do not claim offer/coupon production readiness from source tests alone.
+- Frontend tests: **42 passed locally**; backend tests: **129 passed locally**.
+- No frontend checkout pricing logic was replaced; server remains authoritative for offer/coupon calculations.
+- Candidate backend now validates offer price precision, MRP ceiling, schedule validity, and active-product requirement; malformed offer/coupon schedules fail closed.
+- End-to-end MRP → offer → coupon → Cashfree payable amount → webhook → download entitlement still requires isolated staging verification.
+
+## Candidate v18 frontend update (2026-10-11)
+- Added a manual “Reconcile old reservations” control to Admin → Coupons with explicit confirmation and per-order results.
+- UI copy warns that pending payments retain reservation capacity; only confirmed terminal failures are released.
+- Frontend pytest: **43 passed**; JavaScript and inline HTML script syntax checks passed.
+- Browser staging behavior is not yet verified.
 
 
-## Candidate v14 update — checkout pricing consistency
-- Fixed legacy coupon type mismatch: `PERCENTAGE` records are now calculated as percentage discounts, not flat currency discounts.
-- Checkout product restrictions accept legacy JSON arrays as well as the canonical comma-separated format written by the admin manager.
-- Invalid active offer values, sale price above MRP, invalid precision, and malformed base prices fail closed before payment amount creation.
-- Runtime checkout validation rejects corrupt legacy coupon discount rows (non-finite/non-positive values, excess precision, unknown type, percentage above 100%).
-- Backend local tests: 133 passed; frontend local tests: 42 passed; JavaScript syntax checks are required again for the final archive.
-- Still not production/staging verified: coupon usage-limit concurrency, end-to-end Cashfree webhook/download, R2 cover/PDF behavior, Brevo delivery, role matrix, backup/restore drill and browser mobile checks.
+## Candidate v19 consistency hardening (2026-10-11)
+- Backend pytest: **154 passed locally**; frontend pytest: **43 passed locally**.
+- Fixed a recovery gap: reconciliation now includes old `RESERVED` rows for already-PAID orders and completes coupon redemption accounting without querying Cashfree again. This handles the crash window where order status became PAID but coupon reservation redemption failed afterward.
+- Hardened legacy coupon deletion: coupons with active reservations cannot be deleted (409); coupons already used by historical orders are deactivated instead of deleted; only unused and unreserved coupons can be physically deleted.
+- `node --check` passed for backend source/website JS and frontend root JS.
+- These changes are local-source tested only. A real D1 transactional/concurrency test and Cashfree staging recovery test remain required. Production Worker, production D1, production secrets, and `main` were not changed.
 
-
-## Candidate v17 — atomic coupon reservation and payment-state safety (2026-10-11)
-
-- Backend pytest: **148 passed locally**; frontend pytest: **42 passed locally**.
-- Added migration `018_atomic_coupon_reservations.sql`: coupon `reserved_count` plus `coupon_reservations` lifecycle table. Before a discounted paid or free order proceeds, the Worker atomically reserves available coupon capacity with a conditional update. This closes the last-use concurrency race at checkout creation.
-- On successful payment, reservation redemption is guarded by the `RESERVED` state and executed through a D1 batch, so duplicate webhook/return-page handling does not count a reservation twice. Legacy orders without a reservation keep the prior usage-count compatibility path.
-- Coupon capacity is released when Cashfree order creation fails, the local order insert fails, or Cashfree reports a definitive failure. An empty Cashfree payment list is now treated as `PENDING`, not a definitive failure, so an early status poll does not release a coupon while payment may still be in progress.
-- SQLite baseline + migrations 001–018 smoke test passed; backend and frontend JS syntax checks passed; 6 inline HTML script checks passed. ZIP extraction and extracted tests are checked separately for the v17 handoff.
-- **Known remaining risk:** reservations for abandoned but still-pending Cashfree orders need an explicit, safe expiry/reconciliation policy. They are not automatically released merely because time passed, to avoid releasing a slot for a payment that may still complete. A staging test must confirm Cashfree's terminal-status behavior before defining this cleanup policy.
-- Still not verified: Cloudflare D1/R2 runtime, Cashfree Sandbox response shapes and webhook delivery, Brevo inbox, real concurrent staging checkouts, browser/mobile behavior, and the full purchase-to-download flow. Production Worker, production D1, production secrets and production `main` remain untouched.
-
-## Candidate v18 — stale coupon reservation reconciliation (2026-10-11)
-- Added protected `POST /api/v2/admin/coupons/reconcile-reservations`, requiring `coupons.manage` session permission.
-- Reconciliation inspects at most 20 reservations older than 30 minutes per call. Age alone never releases a reservation: it queries Cashfree and releases only on a definitive `FAILED` result; `PENDING`, provider errors and amount mismatch retain the reservation; `SUCCESS` goes through the existing paid-order/token path.
-- Added Admin Coupons UI control with confirmation and visible per-order results. Route is matched before generic coupon-manager routing.
-- Added four backend contract/security regression tests and one frontend UI test.
-- Local checks: backend **152 passed**, frontend **43 passed**, JS syntax checks passed, inline HTML script checks passed, SQLite schema + migrations **001–018** passed.
-- This is a manual staging reconciliation tool, not an automated scheduler. Cloudflare D1 concurrency, Cashfree status response behavior and full purchase-to-download still require staging verification. No production Worker, D1, secrets or `main` was changed.
+## Candidate v20 coupon-accounting integrity fix (2026-10-11)
+- Backend pytest: **157 passed locally**; frontend pytest: **43 passed locally**.
+- Coupon redemption now fails closed if a RESERVED reservation points to a missing coupon row; it no longer silently marks that reservation REDEEMED without a coupon count update.
+- Redemption verifies both D1 batch update change counts and checks the resulting reservation state, reducing the chance that concurrent calls or inconsistent data are reported as a successful redemption.
+- The legacy `order_discounts` usage-count fallback now runs only when no coupon-reservation record exists for that order (legacy order compatibility); it will not hide a RELEASED/otherwise unresolved reservation.
+- `node --check` passed for backend `src/*.js`, backend `website/*.js`, and frontend root `*.js`. SQLite baseline schema + migrations 001–018 passed in an in-memory smoke test.
+- Still not verified: Cloudflare D1 runtime/transaction behavior, Cashfree sandbox, Brevo inbox, browser/mobile staging, and complete purchase-to-download. No production Worker, D1, secrets or `main` was changed.
 
 
 ## Candidate v21 — coupon release accounting hardening (2026-10-11)
@@ -166,3 +144,11 @@ Do not report 100% until every in-scope row is `COMPLETE — ACCEPTANCE CRITERIA
 - Baseline SQLite schema plus migrations **001–018** passed in an in-memory smoke test.
 - No production Worker, production D1, production secrets, or `main` branch was changed.
 - Still not verified: Cloudflare D1 runtime/concurrency, Cashfree Sandbox, Brevo inbox, R2 private PDF delivery, Android/browser staging, admin role matrix, and complete purchase-to-download.
+
+## Candidate v22 — coupon counter underflow guard (2026-10-11)
+- Backend pytest: **161 passed locally**; frontend pytest: **43 passed locally**.
+- Coupon reservation release and redemption now require `reserved_count > 0` and decrement directly, instead of clamping an inconsistent zero/negative counter with `MAX(0, ...)`. This makes counter underflow an explicit integrity failure rather than silently concealing it.
+- Added two regression tests for release/redemption underflow protection.
+- `node --check` passed for backend `src/*.js`, backend `website/*.js`, and frontend root `*.js`.
+- Baseline schema plus migrations 001–018 applied successfully in an in-memory SQLite smoke test.
+- Still unverified: Cloudflare D1 runtime/concurrency, Cashfree Sandbox, Brevo inbox, R2 private PDF delivery, Android/browser staging, admin role matrix, Current Version staging regression, and complete purchase-to-download. No production Worker, production D1, secrets, or `main` branch was changed.
